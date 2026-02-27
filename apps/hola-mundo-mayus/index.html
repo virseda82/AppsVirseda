@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hola Mundo (Mayúsculas)</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+
+  <body>
+    <main class="container">
+      <h1 class="title">Hola Mundo</h1>
+
+      <form id="form" class="form">
+        <label class="label" for="textInput">Escribe algo</label>
+
+        <input
+          id="textInput"
+          class="input"
+          type="text"
+          placeholder="Ej: hola mundo"
+          autocomplete="off"
+          required
+        />
+
+        <button class="button" type="submit">Convertir a MAYÚSCULAS</button>
+      </form>
+
+      <section class="result" aria-live="polite">
+        <p id="output" class="output"></p>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>

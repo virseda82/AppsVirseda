@@ -1,0 +1,11 @@
+{
+  "name": "hola-mundo-mayus",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
