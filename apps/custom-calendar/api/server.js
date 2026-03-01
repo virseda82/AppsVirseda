@@ -13,6 +13,10 @@ app.use(cors({ origin: process.env.WEB_ORIGIN }));
 
 const JWT_SECRET = process.env.JWT_SECRET || "dev_secret_change_me";
 const ADMIN_EMAIL = "virseda82@gmail.com";
+const DEFAULT_FATHER_COLOR = "#dbeafe";
+const DEFAULT_MOTHER_COLOR = "#f3e8ff";
+const DEFAULT_ANCHOR_MONDAY = "2026-03-02";
+const DEFAULT_ANCHOR_OWNER = "father";
 
 function isAdminEmail(email) {
   return String(email || "").toLowerCase() === ADMIN_EMAIL;
@@ -40,6 +44,13 @@ function auth(req, res, next) {
   }
 }
 
+function requireAdmin(req, res, next) {
+  if (!isAdminEmail(req.user?.email)) {
+    return res.status(403).json({ error: "admin only" });
+  }
+  next();
+}
+
 app.get("/health", (_, res) => res.json({ ok: true }));
 const isDevelopment = process.env.NODE_ENV === "development";
 
@@ -48,6 +59,13 @@ function parseIsoDate(value) {
   const t = Date.parse(value);
   if (Number.isNaN(t)) return null;
   return new Date(t);
+}
+
+function parseDateOnly(value) {
+  if (typeof value !== "string") return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return Number.isNaN(parsed.getTime()) ? null : value;
 }
 
 function validateEventPayload(body) {
@@ -72,9 +90,106 @@ function validateEventPayload(body) {
   };
 }
 
+function validateCustodyConfig(payload) {
+  const anchorMonday = parseDateOnly(payload?.anchor_monday);
+  const anchorOwner = String(payload?.anchor_owner || "").toLowerCase();
+  if (!anchorMonday) return { ok: false, error: "anchor_monday must be YYYY-MM-DD" };
+  if (!["father", "mother"].includes(anchorOwner)) return { ok: false, error: "anchor_owner must be father|mother" };
+
+  return {
+    ok: true,
+    value: {
+      anchor_monday: anchorMonday,
+      anchor_owner: anchorOwner,
+      father_color: String(payload?.father_color || DEFAULT_FATHER_COLOR),
+      mother_color: String(payload?.mother_color || DEFAULT_MOTHER_COLOR),
+    },
+  };
+}
+
+function validateCustodyOverride(payload) {
+  const startDate = parseDateOnly(payload?.start_date);
+  const endDate = parseDateOnly(payload?.end_date);
+  const owner = String(payload?.owner || "").toLowerCase();
+  if (!startDate || !endDate) return { ok: false, error: "start_date/end_date must be YYYY-MM-DD" };
+  if (startDate > endDate) return { ok: false, error: "end_date must be >= start_date" };
+  if (!["father", "mother"].includes(owner)) return { ok: false, error: "owner must be father|mother" };
+
+  return {
+    ok: true,
+    value: {
+      start_date: startDate,
+      end_date: endDate,
+      owner,
+      color: payload?.color ? String(payload.color) : null,
+      notes: payload?.notes ? String(payload.notes) : null,
+    },
+  };
+}
+
+async function ensureCustodyConfigForFamily(client, familyId) {
+  await client.query(
+    `INSERT INTO custody_config (family_id, anchor_monday, anchor_owner, father_color, mother_color)
+     VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (family_id) DO NOTHING`,
+    [familyId, DEFAULT_ANCHOR_MONDAY, DEFAULT_ANCHOR_OWNER, DEFAULT_FATHER_COLOR, DEFAULT_MOTHER_COLOR]
+  );
+}
+
+async function requireFamilyMember(client, familyId, userId) {
+  const r = await client.query(
+    "SELECT role FROM family_members WHERE family_id=$1 AND user_id=$2",
+    [familyId, userId]
+  );
+  return r.rows[0]?.role || null;
+}
+
+async function exceedsDailyEventLimit(client, familyId, startAt, excludeEventId = null) {
+  const q = await client.query(
+    `SELECT COUNT(*)::int AS total
+     FROM events
+     WHERE family_id=$1
+       AND (start_at AT TIME ZONE 'UTC')::date = (($2::timestamptz) AT TIME ZONE 'UTC')::date
+       AND ($3::int IS NULL OR id <> $3::int)`,
+    [familyId, startAt, excludeEventId]
+  );
+  return q.rows[0].total >= 3;
+}
+
+async function findEventWithRole(client, eventId, userId) {
+  const q = await client.query(
+    `SELECT e.id, e.family_id, fm.role
+     FROM events e
+     LEFT JOIN family_members fm ON fm.family_id=e.family_id AND fm.user_id=$2
+     WHERE e.id=$1`,
+    [eventId, userId]
+  );
+  return q.rows[0] || null;
+}
+
+async function fetchCustodyForFamily(client, familyId) {
+  await ensureCustodyConfigForFamily(client, familyId);
+
+  const configQ = await client.query(
+    `SELECT family_id, anchor_monday, anchor_owner, father_color, mother_color, updated_at
+     FROM custody_config
+     WHERE family_id=$1`,
+    [familyId]
+  );
+
+  const overridesQ = await client.query(
+    `SELECT id, family_id, start_date, end_date, owner, color, notes, created_at
+     FROM custody_overrides
+     WHERE family_id=$1
+     ORDER BY start_date ASC, id ASC`,
+    [familyId]
+  );
+
+  return { config: configQ.rows[0] || null, overrides: overridesQ.rows };
+}
+
 /**
- * Bootstrap DB (rápido para arrancar)
- * En producción lo quitaríamos o protegeríamos con una clave.
+ * Bootstrap DB (dev only)
  */
 app.post("/admin/bootstrap", async (_req, res) => {
   if (!isDevelopment) {
@@ -90,8 +205,14 @@ app.post("/admin/bootstrap", async (_req, res) => {
         id SERIAL PRIMARY KEY,
         email TEXT UNIQUE NOT NULL,
         name TEXT,
+        color TEXT NOT NULL DEFAULT '#3b82f6',
         password_hash TEXT NOT NULL
       );
+    `);
+
+    await client.query(`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS color TEXT NOT NULL DEFAULT '#3b82f6';
     `);
 
     await client.query(`
@@ -129,6 +250,43 @@ app.post("/admin/bootstrap", async (_req, res) => {
       CREATE INDEX IF NOT EXISTS events_family_start_idx ON events(family_id, start_at);
     `);
 
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS custody_config (
+        family_id INT PRIMARY KEY REFERENCES families(id) ON DELETE CASCADE,
+        anchor_monday DATE NOT NULL DEFAULT '2026-03-02',
+        anchor_owner TEXT NOT NULL CHECK (anchor_owner IN ('father','mother')) DEFAULT 'father',
+        father_color TEXT NOT NULL DEFAULT '#dbeafe',
+        mother_color TEXT NOT NULL DEFAULT '#f3e8ff',
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS custody_overrides (
+        id SERIAL PRIMARY KEY,
+        family_id INT NOT NULL REFERENCES families(id) ON DELETE CASCADE,
+        start_date DATE NOT NULL,
+        end_date DATE NOT NULL,
+        owner TEXT NOT NULL CHECK (owner IN ('father','mother')),
+        color TEXT,
+        notes TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        CHECK (end_date >= start_date)
+      );
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS custody_overrides_family_dates_idx
+      ON custody_overrides(family_id, start_date, end_date);
+    `);
+
+    await client.query(`
+      INSERT INTO custody_config (family_id, anchor_monday, anchor_owner, father_color, mother_color)
+      SELECT f.id, $1::date, $2, $3, $4
+      FROM families f
+      ON CONFLICT (family_id) DO NOTHING;
+    `, [DEFAULT_ANCHOR_MONDAY, DEFAULT_ANCHOR_OWNER, DEFAULT_FATHER_COLOR, DEFAULT_MOTHER_COLOR]);
+
     await client.query("COMMIT");
     res.json({ ok: true, message: "DB bootstrap done" });
   } catch (e) {
@@ -150,10 +308,10 @@ app.post("/auth/register", async (req, res) => {
   const client = await pool.connect();
   try {
     const ins = await client.query(
-      `INSERT INTO users(email, name, password_hash)
-       VALUES ($1,$2,$3)
-       RETURNING id, email, name`,
-      [email.toLowerCase(), name || null, hash]
+      `INSERT INTO users(email, name, color, password_hash)
+       VALUES ($1,$2,$3,$4)
+       RETURNING id, email, name, color`,
+      [email.toLowerCase(), name || null, "#3b82f6", hash]
     );
 
     const token = signToken(ins.rows[0]);
@@ -176,7 +334,7 @@ app.post("/auth/login", async (req, res) => {
   const client = await pool.connect();
   try {
     const q = await client.query(
-      "SELECT id, email, name, password_hash FROM users WHERE email=$1",
+      "SELECT id, email, name, color, password_hash FROM users WHERE email=$1",
       [email.toLowerCase()]
     );
     const user = q.rows[0];
@@ -188,7 +346,13 @@ app.post("/auth/login", async (req, res) => {
     const token = signToken(user);
     res.json({
       token,
-      user: { id: user.id, email: user.email, name: user.name, is_admin: isAdminEmail(user.email) },
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        color: user.color,
+        is_admin: isAdminEmail(user.email),
+      },
     });
   } finally {
     client.release();
@@ -243,6 +407,8 @@ app.post("/families", auth, async (req, res) => {
       }
     }
 
+    await ensureCustodyConfigForFamily(client, fam.rows[0].id);
+
     await client.query("COMMIT");
     res.status(201).json({ family: fam.rows[0] });
   } catch (e) {
@@ -254,29 +420,10 @@ app.post("/families", auth, async (req, res) => {
   }
 });
 
-async function requireFamilyMember(client, familyId, userId) {
-  const r = await client.query(
-    "SELECT role FROM family_members WHERE family_id=$1 AND user_id=$2",
-    [familyId, userId]
-  );
-  return r.rows[0]?.role || null;
-}
-
-async function exceedsDailyEventLimit(client, familyId, startAt, excludeEventId = null) {
-  const q = await client.query(
-    `SELECT COUNT(*)::int AS total
-     FROM events
-     WHERE family_id=$1
-       AND (start_at AT TIME ZONE 'UTC')::date = (($2::timestamptz) AT TIME ZONE 'UTC')::date
-       AND ($3::int IS NULL OR id <> $3::int)`,
-    [familyId, startAt, excludeEventId]
-  );
-  return q.rows[0].total >= 3;
-}
-
 app.get("/families/:familyId/events", auth, async (req, res) => {
-  const { familyId } = req.params;
+  const familyId = Number(req.params.familyId);
   const { from, to } = req.query;
+  if (!familyId) return res.status(400).json({ error: "invalid family id" });
   if (!from || !to) return res.status(400).json({ error: "from/to required" });
 
   const client = await pool.connect();
@@ -298,7 +445,9 @@ app.get("/families/:familyId/events", auth, async (req, res) => {
 });
 
 app.post("/families/:familyId/events", auth, async (req, res) => {
-  const { familyId } = req.params;
+  const familyId = Number(req.params.familyId);
+  if (!familyId) return res.status(400).json({ error: "invalid family id" });
+
   const validated = validateEventPayload(req.body);
   if (!validated.ok) return res.status(400).json({ error: validated.error });
   const { title, notes, startAt, endAt, allDay, color } = validated.value;
@@ -329,17 +478,6 @@ app.post("/families/:familyId/events", auth, async (req, res) => {
     client.release();
   }
 });
-
-async function findEventWithRole(client, eventId, userId) {
-  const q = await client.query(
-    `SELECT e.id, e.family_id, fm.role
-     FROM events e
-     LEFT JOIN family_members fm ON fm.family_id=e.family_id AND fm.user_id=$2
-     WHERE e.id=$1`,
-    [eventId, userId]
-  );
-  return q.rows[0] || null;
-}
 
 app.put("/events/:id", auth, async (req, res) => {
   const eventId = Number(req.params.id);
@@ -399,11 +537,26 @@ app.delete("/events/:id", auth, async (req, res) => {
   }
 });
 
-app.post("/admin/reset-events", auth, async (req, res) => {
-  if (!isAdminEmail(req.user?.email)) {
-    return res.status(403).json({ error: "admin only" });
-  }
+app.get("/families/:familyId/custody", auth, async (req, res) => {
+  const familyId = Number(req.params.familyId);
+  if (!familyId) return res.status(400).json({ error: "invalid family id" });
 
+  const client = await pool.connect();
+  try {
+    const role = await requireFamilyMember(client, familyId, req.user.userId);
+    if (!role) return res.status(403).json({ error: "Not a family member" });
+
+    const payload = await fetchCustodyForFamily(client, familyId);
+    res.json(payload);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "list custody failed" });
+  } finally {
+    client.release();
+  }
+});
+
+app.post("/admin/reset-events", auth, requireAdmin, async (_req, res) => {
   const client = await pool.connect();
   try {
     await client.query("TRUNCATE TABLE events RESTART IDENTITY CASCADE");
@@ -411,6 +564,247 @@ app.post("/admin/reset-events", auth, async (req, res) => {
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: "reset events failed" });
+  } finally {
+    client.release();
+  }
+});
+
+app.get("/admin/users", auth, requireAdmin, async (_req, res) => {
+  const client = await pool.connect();
+  try {
+    const q = await client.query("SELECT id, email, name, color FROM users ORDER BY id ASC");
+    res.json({ users: q.rows });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "list users failed" });
+  } finally {
+    client.release();
+  }
+});
+
+app.get("/admin/families", auth, requireAdmin, async (_req, res) => {
+  const client = await pool.connect();
+  try {
+    const q = await client.query("SELECT id, name FROM families ORDER BY id ASC");
+    res.json({ families: q.rows });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "list families failed" });
+  } finally {
+    client.release();
+  }
+});
+
+app.post("/admin/users", auth, requireAdmin, async (req, res) => {
+  const { email, name, color, password } = req.body;
+  if (!email || !password) return res.status(400).json({ error: "email/password required" });
+  if (String(password).length < 8) return res.status(400).json({ error: "password min 8 chars" });
+
+  const client = await pool.connect();
+  try {
+    const hash = await bcrypt.hash(password, 12);
+    const ins = await client.query(
+      `INSERT INTO users(email, name, color, password_hash)
+       VALUES($1,$2,$3,$4)
+       RETURNING id, email, name, color`,
+      [String(email).toLowerCase(), name || null, color || "#3b82f6", hash]
+    );
+    res.status(201).json({ user: ins.rows[0] });
+  } catch (e) {
+    if (String(e?.message || "").includes("duplicate key")) {
+      return res.status(409).json({ error: "email already exists" });
+    }
+    console.error(e);
+    res.status(500).json({ error: "create user failed" });
+  } finally {
+    client.release();
+  }
+});
+
+app.put("/admin/users/:id", auth, requireAdmin, async (req, res) => {
+  const userId = Number(req.params.id);
+  if (!Number.isInteger(userId) || userId <= 0) return res.status(400).json({ error: "invalid user id" });
+
+  const { name, color, password } = req.body;
+  const fields = [];
+  const params = [];
+  let idx = 1;
+
+  if (typeof name !== "undefined") {
+    fields.push(`name=$${idx++}`);
+    params.push(name || null);
+  }
+  if (typeof color !== "undefined") {
+    fields.push(`color=$${idx++}`);
+    params.push(color || "#3b82f6");
+  }
+  if (typeof password !== "undefined") {
+    if (String(password).length < 8) return res.status(400).json({ error: "password min 8 chars" });
+    const hash = await bcrypt.hash(String(password), 12);
+    fields.push(`password_hash=$${idx++}`);
+    params.push(hash);
+  }
+
+  if (!fields.length) return res.status(400).json({ error: "no fields to update" });
+
+  params.push(userId);
+
+  const client = await pool.connect();
+  try {
+    const upd = await client.query(
+      `UPDATE users SET ${fields.join(", ")} WHERE id=$${idx} RETURNING id, email, name, color`,
+      params
+    );
+    if (!upd.rows[0]) return res.status(404).json({ error: "user not found" });
+    res.json({ user: upd.rows[0] });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "update user failed" });
+  } finally {
+    client.release();
+  }
+});
+
+app.delete("/admin/users/:id", auth, requireAdmin, async (req, res) => {
+  const userId = Number(req.params.id);
+  if (!Number.isInteger(userId) || userId <= 0) return res.status(400).json({ error: "invalid user id" });
+
+  const client = await pool.connect();
+  try {
+    const q = await client.query("SELECT id, email FROM users WHERE id=$1", [userId]);
+    const user = q.rows[0];
+    if (!user) return res.status(404).json({ error: "user not found" });
+    if (isAdminEmail(user.email)) {
+      return res.status(400).json({ error: "cannot delete admin user" });
+    }
+
+    await client.query("DELETE FROM users WHERE id=$1", [userId]);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "delete user failed" });
+  } finally {
+    client.release();
+  }
+});
+
+app.get("/admin/families/:familyId/custody", auth, requireAdmin, async (req, res) => {
+  const familyId = Number(req.params.familyId);
+  if (!familyId) return res.status(400).json({ error: "invalid family id" });
+
+  const client = await pool.connect();
+  try {
+    const payload = await fetchCustodyForFamily(client, familyId);
+    res.json(payload);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "admin list custody failed" });
+  } finally {
+    client.release();
+  }
+});
+
+app.put("/admin/families/:familyId/custody/config", auth, requireAdmin, async (req, res) => {
+  const familyId = Number(req.params.familyId);
+  if (!familyId) return res.status(400).json({ error: "invalid family id" });
+
+  const validated = validateCustodyConfig(req.body);
+  if (!validated.ok) return res.status(400).json({ error: validated.error });
+
+  const client = await pool.connect();
+  try {
+    const familyQ = await client.query("SELECT id FROM families WHERE id=$1", [familyId]);
+    if (!familyQ.rows[0]) return res.status(404).json({ error: "family not found" });
+
+    const cfg = validated.value;
+    const upsert = await client.query(
+      `INSERT INTO custody_config (family_id, anchor_monday, anchor_owner, father_color, mother_color, updated_at)
+       VALUES ($1,$2,$3,$4,$5,NOW())
+       ON CONFLICT (family_id)
+       DO UPDATE SET anchor_monday=EXCLUDED.anchor_monday,
+                     anchor_owner=EXCLUDED.anchor_owner,
+                     father_color=EXCLUDED.father_color,
+                     mother_color=EXCLUDED.mother_color,
+                     updated_at=NOW()
+       RETURNING family_id, anchor_monday, anchor_owner, father_color, mother_color, updated_at`,
+      [familyId, cfg.anchor_monday, cfg.anchor_owner, cfg.father_color, cfg.mother_color]
+    );
+    res.json({ config: upsert.rows[0] });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "upsert custody config failed" });
+  } finally {
+    client.release();
+  }
+});
+
+app.post("/admin/families/:familyId/custody/overrides", auth, requireAdmin, async (req, res) => {
+  const familyId = Number(req.params.familyId);
+  if (!familyId) return res.status(400).json({ error: "invalid family id" });
+
+  const validated = validateCustodyOverride(req.body);
+  if (!validated.ok) return res.status(400).json({ error: validated.error });
+
+  const client = await pool.connect();
+  try {
+    const familyQ = await client.query("SELECT id FROM families WHERE id=$1", [familyId]);
+    if (!familyQ.rows[0]) return res.status(404).json({ error: "family not found" });
+
+    const ov = validated.value;
+    const ins = await client.query(
+      `INSERT INTO custody_overrides (family_id, start_date, end_date, owner, color, notes)
+       VALUES ($1,$2,$3,$4,$5,$6)
+       RETURNING id, family_id, start_date, end_date, owner, color, notes, created_at`,
+      [familyId, ov.start_date, ov.end_date, ov.owner, ov.color, ov.notes]
+    );
+    res.status(201).json({ override: ins.rows[0] });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "create custody override failed" });
+  } finally {
+    client.release();
+  }
+});
+
+app.put("/admin/custody/overrides/:id", auth, requireAdmin, async (req, res) => {
+  const overrideId = Number(req.params.id);
+  if (!Number.isInteger(overrideId) || overrideId <= 0) return res.status(400).json({ error: "invalid override id" });
+
+  const validated = validateCustodyOverride(req.body);
+  if (!validated.ok) return res.status(400).json({ error: validated.error });
+
+  const client = await pool.connect();
+  try {
+    const ov = validated.value;
+    const upd = await client.query(
+      `UPDATE custody_overrides
+       SET start_date=$2, end_date=$3, owner=$4, color=$5, notes=$6
+       WHERE id=$1
+       RETURNING id, family_id, start_date, end_date, owner, color, notes, created_at`,
+      [overrideId, ov.start_date, ov.end_date, ov.owner, ov.color, ov.notes]
+    );
+    if (!upd.rows[0]) return res.status(404).json({ error: "override not found" });
+    res.json({ override: upd.rows[0] });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "update custody override failed" });
+  } finally {
+    client.release();
+  }
+});
+
+app.delete("/admin/custody/overrides/:id", auth, requireAdmin, async (req, res) => {
+  const overrideId = Number(req.params.id);
+  if (!Number.isInteger(overrideId) || overrideId <= 0) return res.status(400).json({ error: "invalid override id" });
+
+  const client = await pool.connect();
+  try {
+    const del = await client.query("DELETE FROM custody_overrides WHERE id=$1 RETURNING id", [overrideId]);
+    if (!del.rows[0]) return res.status(404).json({ error: "override not found" });
+    res.json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "delete custody override failed" });
   } finally {
     client.release();
   }

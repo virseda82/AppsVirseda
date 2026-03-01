@@ -52,4 +52,18 @@ export const api = {
   updateEvent: (id, payload) => request(`/events/${id}`, { method: "PUT", body: payload }),
   deleteEvent: (id) => request(`/events/${id}`, { method: "DELETE" }),
   adminResetEvents: () => request("/admin/reset-events", { method: "POST" }),
+  getFamilyCustody: (familyId) => request(`/families/${familyId}/custody`),
+  adminListUsers: () => request("/admin/users"),
+  adminListFamilies: () => request("/admin/families"),
+  adminCreateUser: (payload) => request("/admin/users", { method: "POST", body: payload }),
+  adminUpdateUser: (id, payload) => request(`/admin/users/${id}`, { method: "PUT", body: payload }),
+  adminDeleteUser: (id) => request(`/admin/users/${id}`, { method: "DELETE" }),
+  adminGetFamilyCustody: (familyId) => request(`/admin/families/${familyId}/custody`),
+  adminUpsertCustodyConfig: (familyId, payload) =>
+    request(`/admin/families/${familyId}/custody/config`, { method: "PUT", body: payload }),
+  adminCreateCustodyOverride: (familyId, payload) =>
+    request(`/admin/families/${familyId}/custody/overrides`, { method: "POST", body: payload }),
+  adminUpdateCustodyOverride: (id, payload) =>
+    request(`/admin/custody/overrides/${id}`, { method: "PUT", body: payload }),
+  adminDeleteCustodyOverride: (id) => request(`/admin/custody/overrides/${id}`, { method: "DELETE" }),
 };

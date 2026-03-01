@@ -13,7 +13,34 @@ function sameDay(a, b) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
-export default function MonthView({ cursor, events, onDayClick, onEventClick }) {
+function toDateOnly(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function getCustodyDayColor(day, custody) {
+  const config = custody?.config;
+  if (!config) return null;
+
+  const dayKey = toDateOnly(day);
+  const override = (custody?.overrides || []).find((ov) => dayKey >= String(ov.start_date).slice(0, 10) && dayKey <= String(ov.end_date).slice(0, 10));
+  if (override) {
+    if (override.color) return override.color;
+    return override.owner === "mother" ? config.mother_color : config.father_color;
+  }
+
+  const anchor = new Date(`${String(config.anchor_monday).slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(anchor.getTime())) return null;
+  const diffDays = Math.floor((new Date(day.getFullYear(), day.getMonth(), day.getDate()) - anchor) / 86400000);
+  const weekOffset = Math.floor(diffDays / 7);
+  const anchorOwner = config.anchor_owner === "mother" ? "mother" : "father";
+  const owner = weekOffset % 2 === 0 ? anchorOwner : (anchorOwner === "father" ? "mother" : "father");
+  return owner === "mother" ? config.mother_color : config.father_color;
+}
+
+export default function MonthView({ cursor, events, onDayClick, onEventClick, custody }) {
   const gridStart = useMemo(() => startOfGrid(cursor), [cursor]);
   const days = useMemo(() => {
     const arr = [];
@@ -55,6 +82,7 @@ export default function MonthView({ cursor, events, onDayClick, onEventClick }) 
               key={d.toISOString()}
               onClick={() => onDayClick(new Date(d))}
               className={`day-cell ${inMonth ? "" : "day-cell-outside"}`.trim()}
+              style={{ background: getCustodyDayColor(d, custody) || undefined }}
               role="button"
               tabIndex={0}
               onKeyDown={(evt) => {

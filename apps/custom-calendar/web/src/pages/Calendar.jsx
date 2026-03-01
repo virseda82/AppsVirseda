@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { api, getTokenPayload } from "../api.js";
 import MonthView from "../components/MonthView.jsx";
 import EventModal from "../components/EventModal.jsx";
@@ -14,12 +15,13 @@ function sameDay(a, b) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
-export default function CalendarPage({ onLogout }) {
+export default function CalendarPage({ onLogout, isAdmin: isAdminProp = false }) {
   const [families, setFamilies] = useState([]);
   const [familyId, setFamilyId] = useState(null);
 
   const [cursor, setCursor] = useState(() => new Date());
   const [events, setEvents] = useState([]);
+  const [custody, setCustody] = useState({ config: null, overrides: [] });
 
   const [modalOpen, setModalOpen] = useState(false);
   const [modalDate, setModalDate] = useState(null);
@@ -28,8 +30,9 @@ export default function CalendarPage({ onLogout }) {
   const monthLabel = useMemo(() => {
     return cursor.toLocaleString("es-ES", { month: "long", year: "numeric" });
   }, [cursor]);
+
   const tokenPayload = useMemo(() => getTokenPayload(), []);
-  const isAdmin = !!tokenPayload?.is_admin;
+  const isAdmin = isAdminProp || !!tokenPayload?.is_admin;
 
   async function loadFamilies() {
     const r = await api.listFamilies();
@@ -45,8 +48,27 @@ export default function CalendarPage({ onLogout }) {
     setEvents(r.events);
   }
 
-  useEffect(() => { loadFamilies(); }, []);
-  useEffect(() => { if (familyId) loadEvents(familyId, cursor); }, [familyId, cursor]);
+  async function loadCustody(fid) {
+    if (!fid) return;
+    try {
+      const r = await api.getFamilyCustody(fid);
+      setCustody({ config: r.config, overrides: r.overrides || [] });
+    } catch (e) {
+      console.error(e);
+      setCustody({ config: null, overrides: [] });
+    }
+  }
+
+  useEffect(() => {
+    loadFamilies();
+  }, []);
+
+  useEffect(() => {
+    if (familyId) {
+      loadEvents(familyId, cursor);
+      loadCustody(familyId);
+    }
+  }, [familyId, cursor]);
 
   async function createFamilyQuick() {
     const name = prompt("Nombre familia (ej. Familia Oli):");
@@ -179,6 +201,11 @@ export default function CalendarPage({ onLogout }) {
             <button type="button" className="text-btn" onClick={createFamilyQuick}>
               + Familia
             </button>
+            {isAdmin && (
+              <Link className="ghost-btn link-btn" to="/admin">
+                Admin
+              </Link>
+            )}
             <button type="button" className="ghost-btn" onClick={onLogout}>
               Logout
             </button>
@@ -205,7 +232,13 @@ export default function CalendarPage({ onLogout }) {
       </header>
 
       <main className="calendar-content">
-        <MonthView cursor={cursor} events={events} onDayClick={openNewEvent} onEventClick={openEditEvent} />
+        <MonthView
+          cursor={cursor}
+          events={events}
+          onDayClick={openNewEvent}
+          onEventClick={openEditEvent}
+          custody={custody}
+        />
       </main>
 
       <button
