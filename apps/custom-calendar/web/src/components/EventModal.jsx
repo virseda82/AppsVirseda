@@ -7,15 +7,25 @@ function toLocalInputValue(date) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
-export default function EventModal({ open, date, onClose, onCreate }) {
+export default function EventModal({ open, date, event, onClose, onCreate, onUpdate, onDelete }) {
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
   const [allDay, setAllDay] = useState(false);
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
+  const isEditMode = !!event?.id;
 
   useEffect(() => {
     if (!open) return;
+    if (event?.id) {
+      setTitle(event.title || "");
+      setNotes(event.notes || "");
+      setAllDay(!!event.all_day);
+      setStart(toLocalInputValue(new Date(event.start_at)));
+      setEnd(toLocalInputValue(new Date(event.end_at)));
+      return;
+    }
+
     const base = date ? new Date(date) : new Date();
     base.setHours(18, 0, 0, 0);
     const endD = new Date(base);
@@ -26,7 +36,7 @@ export default function EventModal({ open, date, onClose, onCreate }) {
     setAllDay(false);
     setStart(toLocalInputValue(base));
     setEnd(toLocalInputValue(endD));
-  }, [open, date]);
+  }, [open, date, event]);
 
   if (!open) return null;
 
@@ -35,21 +45,27 @@ export default function EventModal({ open, date, onClose, onCreate }) {
     const startAt = new Date(start).toISOString();
     const endAt = new Date(end).toISOString();
 
-    await onCreate({
+    const payload = {
       title: title.trim(),
       notes: notes.trim(),
       startAt,
       endAt,
       allDay,
-      color: null,
-    });
+      color: event?.color || null,
+    };
+
+    if (isEditMode) {
+      await onUpdate(payload);
+      return;
+    }
+    await onCreate(payload);
   }
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="event-modal" onClick={(e) => e.stopPropagation()}>
         <div className="event-modal-header">
-          <h3>Nuevo evento</h3>
+          <h3>{isEditMode ? "Editar evento" : "Nuevo evento"}</h3>
         </div>
 
         <label className="form-field">
@@ -80,8 +96,13 @@ export default function EventModal({ open, date, onClose, onCreate }) {
         </div>
 
         <div className="modal-actions">
+          {isEditMode && (
+            <button type="button" className="danger-btn" onClick={onDelete}>Eliminar</button>
+          )}
           <button type="button" className="ghost-btn" onClick={onClose}>Cancelar</button>
-          <button type="button" className="primary-btn" onClick={submit}>Crear</button>
+          <button type="button" className="primary-btn" onClick={submit}>
+            {isEditMode ? "Guardar" : "Crear"}
+          </button>
         </div>
       </div>
     </div>

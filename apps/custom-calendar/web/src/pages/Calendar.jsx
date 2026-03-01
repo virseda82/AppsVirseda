@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { api } from "../api.js";
+import { api, getTokenPayload } from "../api.js";
 import MonthView from "../components/MonthView.jsx";
 import EventModal from "../components/EventModal.jsx";
 
@@ -19,10 +19,13 @@ export default function CalendarPage({ onLogout }) {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [modalDate, setModalDate] = useState(null);
+  const [selectedEvent, setSelectedEvent] = useState(null);
 
   const monthLabel = useMemo(() => {
     return cursor.toLocaleString("es-ES", { month: "long", year: "numeric" });
   }, [cursor]);
+  const tokenPayload = useMemo(() => getTokenPayload(), []);
+  const isAdmin = !!tokenPayload?.is_admin;
 
   async function loadFamilies() {
     const r = await api.listFamilies();
@@ -61,6 +64,13 @@ export default function CalendarPage({ onLogout }) {
 
   function openNewEvent(date) {
     setModalDate(date);
+    setSelectedEvent(null);
+    setModalOpen(true);
+  }
+
+  function openEditEvent(event) {
+    setSelectedEvent(event);
+    setModalDate(event?.start_at ? new Date(event.start_at) : new Date());
     setModalOpen(true);
   }
 
@@ -68,6 +78,30 @@ export default function CalendarPage({ onLogout }) {
     await api.createEvent(familyId, { title, notes, startAt, endAt, allDay, color });
     setModalOpen(false);
     await loadEvents(familyId, cursor);
+  }
+
+  async function handleUpdateEvent({ title, notes, startAt, endAt, allDay, color }) {
+    if (!selectedEvent?.id) return;
+    await api.updateEvent(selectedEvent.id, { title, notes, startAt, endAt, allDay, color });
+    setModalOpen(false);
+    setSelectedEvent(null);
+    await loadEvents(familyId, cursor);
+  }
+
+  async function handleDeleteEvent() {
+    if (!selectedEvent?.id) return;
+    if (!confirm("¿Eliminar este evento?")) return;
+    await api.deleteEvent(selectedEvent.id);
+    setModalOpen(false);
+    setSelectedEvent(null);
+    await loadEvents(familyId, cursor);
+  }
+
+  async function handleResetEvents() {
+    if (!confirm("Esto borrará TODOS los eventos. ¿Continuar?")) return;
+    await api.adminResetEvents();
+    await loadEvents(familyId, cursor);
+    alert("Eventos reseteados.");
   }
 
   const hasFamilies = families.length > 0;
@@ -113,6 +147,16 @@ export default function CalendarPage({ onLogout }) {
             <button type="button" className="ghost-btn" onClick={onLogout}>
               Logout
             </button>
+            {isAdmin && (
+              <button
+                type="button"
+                className="ghost-btn"
+                onClick={handleResetEvents}
+                disabled={!hasFamilies}
+              >
+                Reset events
+              </button>
+            )}
             <button
               type="button"
               className="primary-btn desktop-event-btn"
@@ -126,7 +170,7 @@ export default function CalendarPage({ onLogout }) {
       </header>
 
       <main className="calendar-content">
-        <MonthView cursor={cursor} events={events} onDayClick={openNewEvent} />
+        <MonthView cursor={cursor} events={events} onDayClick={openNewEvent} onEventClick={openEditEvent} />
       </main>
 
       <button
@@ -142,8 +186,11 @@ export default function CalendarPage({ onLogout }) {
       <EventModal
         open={modalOpen}
         date={modalDate}
+        event={selectedEvent}
         onClose={() => setModalOpen(false)}
         onCreate={handleCreateEvent}
+        onUpdate={handleUpdateEvent}
+        onDelete={handleDeleteEvent}
       />
     </div>
   );

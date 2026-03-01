@@ -13,7 +13,7 @@ function sameDay(a, b) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
-export default function MonthView({ cursor, events, onDayClick }) {
+export default function MonthView({ cursor, events, onDayClick, onEventClick }) {
   const gridStart = useMemo(() => startOfGrid(cursor), [cursor]);
   const days = useMemo(() => {
     const arr = [];
@@ -51,11 +51,18 @@ export default function MonthView({ cursor, events, onDayClick }) {
           const isToday = sameDay(d, new Date());
 
           return (
-            <button
-              type="button"
+            <div
               key={d.toISOString()}
               onClick={() => onDayClick(new Date(d))}
               className={`day-cell ${inMonth ? "" : "day-cell-outside"}`.trim()}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(evt) => {
+                if (evt.key === "Enter" || evt.key === " ") {
+                  evt.preventDefault();
+                  onDayClick(new Date(d));
+                }
+              }}
               aria-label={`Día ${d.getDate()}`}
             >
               <div className="day-head">
@@ -66,10 +73,15 @@ export default function MonthView({ cursor, events, onDayClick }) {
 
               <div className="day-events">
                 {dayEvents.slice(0, 3).map((e) => (
-                  <span
+                  <button
+                    type="button"
                     key={e.id}
                     className="event-row"
                     title={e.title}
+                    onClick={(evt) => {
+                      evt.stopPropagation();
+                      onEventClick?.(e);
+                    }}
                   >
                     <span
                       className="event-dot"
@@ -77,13 +89,13 @@ export default function MonthView({ cursor, events, onDayClick }) {
                       aria-hidden="true"
                     />
                     <span className="event-text">{e.title}</span>
-                  </span>
+                  </button>
                 ))}
                 {dayEvents.length > 3 && (
                   <span className="more-events-link">+{dayEvents.length - 3} más</span>
                 )}
               </div>
-            </button>
+            </div>
           );
         })}
       </div>

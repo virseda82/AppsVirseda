@@ -84,7 +84,8 @@ select {
 .icon-btn,
 .text-btn,
 .ghost-btn,
-.primary-btn {
+.primary-btn,
+.danger-btn {
   border: 1px solid var(--border);
   background: #fff;
   color: #3c4043;
@@ -125,6 +126,17 @@ select {
 .primary-btn:hover {
   background: var(--primary-hover);
   border-color: var(--primary-hover);
+}
+
+.danger-btn {
+  border-color: #dc3545;
+  background: #fff;
+  color: #b42318;
+  font-weight: 600;
+}
+
+.danger-btn:hover {
+  background: #fff1f2;
 }
 
 .primary-btn:disabled,
@@ -194,6 +206,10 @@ select {
   box-shadow: var(--shadow-soft);
 }
 
+.day-cell:focus-visible {
+  outline: 2px solid rgba(26, 115, 232, 0.32);
+}
+
 .day-cell-outside {
   background: #f9fbff;
   opacity: 0.72;
@@ -231,11 +247,17 @@ select {
 }
 
 .event-row {
+  width: 100%;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  text-align: left;
   min-width: 0;
   display: inline-flex;
   align-items: center;
   gap: 7px;
   color: #202124;
+  cursor: pointer;
 }
 
 .event-dot {

@@ -10,6 +10,20 @@ export function clearToken() {
   localStorage.removeItem("token");
 }
 
+export function getTokenPayload() {
+  const token = getToken();
+  if (!token) return null;
+  const parts = token.split(".");
+  if (parts.length !== 3) return null;
+  try {
+    const normalized = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(normalized.length + ((4 - (normalized.length % 4)) % 4), "=");
+    return JSON.parse(atob(padded));
+  } catch {
+    return null;
+  }
+}
+
 async function request(path, { method = "GET", body } = {}) {
   const headers = { "Content-Type": "application/json" };
   const token = getToken();
@@ -27,7 +41,6 @@ async function request(path, { method = "GET", body } = {}) {
 }
 
 export const api = {
-  bootstrap: () => request("/admin/bootstrap", { method: "POST" }),
   register: (payload) => request("/auth/register", { method: "POST", body: payload }),
   login: (payload) => request("/auth/login", { method: "POST", body: payload }),
   listFamilies: () => request("/families"),
@@ -36,4 +49,7 @@ export const api = {
     request(`/families/${familyId}/events?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
   createEvent: (familyId, payload) =>
     request(`/families/${familyId}/events`, { method: "POST", body: payload }),
+  updateEvent: (id, payload) => request(`/events/${id}`, { method: "PUT", body: payload }),
+  deleteEvent: (id) => request(`/events/${id}`, { method: "DELETE" }),
+  adminResetEvents: () => request("/admin/reset-events", { method: "POST" }),
 };
