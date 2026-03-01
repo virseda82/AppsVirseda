@@ -12,7 +12,8 @@ function Field({ label, ...props }) {
 }
 
 export default function App() {
-  const showDevBootstrap = import.meta.env.DEV;
+  const QUICK_EMAIL = "virseda82@gmail.com";
+  const QUICK_PASSWORD = "12345678";
   const [mode, setMode] = useState("login");
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
@@ -22,21 +23,22 @@ export default function App() {
 
   useEffect(() => { setReady(true); }, []);
 
-  async function handleBootstrap() {
-    setErr("");
-    try {
-      await api.bootstrap();
-      alert("DB bootstrap OK");
-    } catch (e) {
-      setErr(e.message);
-    }
-  }
-
   async function handleAuth() {
     setErr("");
     try {
       const payload = mode === "register" ? { email, name, password } : { email, password };
       const r = mode === "register" ? await api.register(payload) : await api.login(payload);
+      setToken(r.token);
+      window.location.reload();
+    } catch (e) {
+      setErr(e.message);
+    }
+  }
+
+  async function handleQuickAccessPablo() {
+    setErr("");
+    try {
+      const r = await api.login({ email: QUICK_EMAIL, password: QUICK_PASSWORD });
       setToken(r.token);
       window.location.reload();
     } catch (e) {
@@ -68,12 +70,9 @@ export default function App() {
         <button onClick={handleAuth} style={{ padding: 12, width: "100%", marginTop: 10 }}>
           {mode === "login" ? "Login" : "Create account"}
         </button>
-
-        {showDevBootstrap && (
-          <button onClick={handleBootstrap} style={{ padding: 12, width: "100%", marginTop: 10 }}>
-            (Dev) Bootstrap DB tables
-          </button>
-        )}
+        <button onClick={handleQuickAccessPablo} style={{ padding: 12, width: "100%", marginTop: 10 }}>
+          Acceso Pablo Rapidao
+        </button>
 
         {err && <p style={{ color: "crimson", marginTop: 15 }}>{err}</p>}
       </div>

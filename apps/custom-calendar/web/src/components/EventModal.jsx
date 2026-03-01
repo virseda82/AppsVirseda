@@ -13,6 +13,7 @@ export default function EventModal({ open, date, event, onClose, onCreate, onUpd
   const [allDay, setAllDay] = useState(false);
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
+  const [busy, setBusy] = useState(false);
   const isEditMode = !!event?.id;
 
   useEffect(() => {
@@ -36,6 +37,7 @@ export default function EventModal({ open, date, event, onClose, onCreate, onUpd
     setAllDay(false);
     setStart(toLocalInputValue(base));
     setEnd(toLocalInputValue(endD));
+    setBusy(false);
   }, [open, date, event]);
 
   if (!open) return null;
@@ -54,11 +56,26 @@ export default function EventModal({ open, date, event, onClose, onCreate, onUpd
       color: event?.color || null,
     };
 
-    if (isEditMode) {
-      await onUpdate(payload);
-      return;
+    setBusy(true);
+    try {
+      if (isEditMode) {
+        await onUpdate(payload);
+        return;
+      }
+      await onCreate(payload);
+    } finally {
+      setBusy(false);
     }
-    await onCreate(payload);
+  }
+
+  async function handleDeleteClick() {
+    if (!onDelete) return;
+    setBusy(true);
+    try {
+      await onDelete();
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -97,10 +114,12 @@ export default function EventModal({ open, date, event, onClose, onCreate, onUpd
 
         <div className="modal-actions">
           {isEditMode && (
-            <button type="button" className="danger-btn" onClick={onDelete}>Eliminar</button>
+            <button type="button" className="danger-btn" onClick={handleDeleteClick} disabled={busy}>
+              Eliminar
+            </button>
           )}
-          <button type="button" className="ghost-btn" onClick={onClose}>Cancelar</button>
-          <button type="button" className="primary-btn" onClick={submit}>
+          <button type="button" className="ghost-btn" onClick={onClose} disabled={busy}>Cancelar</button>
+          <button type="button" className="primary-btn" onClick={submit} disabled={busy}>
             {isEditMode ? "Guardar" : "Crear"}
           </button>
         </div>

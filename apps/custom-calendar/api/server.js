@@ -262,6 +262,18 @@ async function requireFamilyMember(client, familyId, userId) {
   return r.rows[0]?.role || null;
 }
 
+async function exceedsDailyEventLimit(client, familyId, startAt, excludeEventId = null) {
+  const q = await client.query(
+    `SELECT COUNT(*)::int AS total
+     FROM events
+     WHERE family_id=$1
+       AND (start_at AT TIME ZONE 'UTC')::date = (($2::timestamptz) AT TIME ZONE 'UTC')::date
+       AND ($3::int IS NULL OR id <> $3::int)`,
+    [familyId, startAt, excludeEventId]
+  );
+  return q.rows[0].total >= 3;
+}
+
 app.get("/families/:familyId/events", auth, async (req, res) => {
   const { familyId } = req.params;
   const { from, to } = req.query;
@@ -296,6 +308,10 @@ app.post("/families/:familyId/events", auth, async (req, res) => {
     const role = await requireFamilyMember(client, familyId, req.user.userId);
     if (!role || (role !== "owner" && role !== "editor")) {
       return res.status(403).json({ error: "No write permission" });
+    }
+    const limitReached = await exceedsDailyEventLimit(client, familyId, startAt);
+    if (limitReached) {
+      return res.status(400).json({ error: "daily event limit reached (max 3)" });
     }
 
     const ins = await client.query(
@@ -339,6 +355,10 @@ app.put("/events/:id", auth, async (req, res) => {
     if (!eventCtx) return res.status(404).json({ error: "event not found" });
     if (!eventCtx.role || !["owner", "editor"].includes(eventCtx.role)) {
       return res.status(403).json({ error: "No write permission" });
+    }
+    const limitReached = await exceedsDailyEventLimit(client, eventCtx.family_id, startAt, eventId);
+    if (limitReached) {
+      return res.status(400).json({ error: "daily event limit reached (max 3)" });
     }
 
     const upd = await client.query(

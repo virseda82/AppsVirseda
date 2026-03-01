@@ -10,6 +10,10 @@ function isoStartOfNextMonth(d) {
   return new Date(d.getFullYear(), d.getMonth() + 1, 1).toISOString();
 }
 
+function sameDay(a, b) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
 export default function CalendarPage({ onLogout }) {
   const [families, setFamilies] = useState([]);
   const [familyId, setFamilyId] = useState(null);
@@ -74,27 +78,58 @@ export default function CalendarPage({ onLogout }) {
     setModalOpen(true);
   }
 
+  function countEventsForLocalDay(isoDate, excludeEventId = null) {
+    const target = new Date(isoDate);
+    return events.filter((ev) => {
+      if (excludeEventId && ev.id === excludeEventId) return false;
+      return sameDay(new Date(ev.start_at), target);
+    }).length;
+  }
+
   async function handleCreateEvent({ title, notes, startAt, endAt, allDay, color }) {
-    await api.createEvent(familyId, { title, notes, startAt, endAt, allDay, color });
-    setModalOpen(false);
-    await loadEvents(familyId, cursor);
+    if (countEventsForLocalDay(startAt) >= 3) {
+      alert("Límite diario alcanzado: máximo 3 eventos por día.");
+      return;
+    }
+    try {
+      await api.createEvent(familyId, { title, notes, startAt, endAt, allDay, color });
+      setModalOpen(false);
+      await loadEvents(familyId, cursor);
+    } catch (e) {
+      alert(e.message || "No se pudo crear el evento");
+      throw e;
+    }
   }
 
   async function handleUpdateEvent({ title, notes, startAt, endAt, allDay, color }) {
     if (!selectedEvent?.id) return;
-    await api.updateEvent(selectedEvent.id, { title, notes, startAt, endAt, allDay, color });
-    setModalOpen(false);
-    setSelectedEvent(null);
-    await loadEvents(familyId, cursor);
+    if (countEventsForLocalDay(startAt, selectedEvent.id) >= 3) {
+      alert("Límite diario alcanzado: máximo 3 eventos por día.");
+      return;
+    }
+    try {
+      await api.updateEvent(selectedEvent.id, { title, notes, startAt, endAt, allDay, color });
+      setModalOpen(false);
+      setSelectedEvent(null);
+      await loadEvents(familyId, cursor);
+    } catch (e) {
+      alert(e.message || "No se pudo actualizar el evento");
+      throw e;
+    }
   }
 
   async function handleDeleteEvent() {
     if (!selectedEvent?.id) return;
     if (!confirm("¿Eliminar este evento?")) return;
-    await api.deleteEvent(selectedEvent.id);
-    setModalOpen(false);
-    setSelectedEvent(null);
-    await loadEvents(familyId, cursor);
+    try {
+      await api.deleteEvent(selectedEvent.id);
+      setModalOpen(false);
+      setSelectedEvent(null);
+      await loadEvents(familyId, cursor);
+    } catch (e) {
+      alert(e.message || "No se pudo eliminar el evento");
+      throw e;
+    }
   }
 
   async function handleResetEvents() {

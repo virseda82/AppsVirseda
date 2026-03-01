@@ -4,7 +4,8 @@
   "scripts": {
     "dev": "concurrently -n api,web -c green,blue \"npm --prefix api start\" \"npm --prefix web run dev\"",
     "dev:api": "npm --prefix api start",
-    "dev:web": "npm --prefix web run dev"
+    "dev:web": "npm --prefix web run dev",
+    "smoke": "bash ./scripts/smoke-test.sh"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"
