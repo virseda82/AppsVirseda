@@ -26,9 +26,14 @@ if (!databaseUrl) {
 
 const needsSSL = databaseUrl.includes("render.com") || databaseUrl.includes("dpg-");
 const hasSSLMode = /[?&]sslmode=/i.test(databaseUrl);
-if (needsSSL && !hasSSLMode) {
+const hasLibpqCompat = /[?&]uselibpqcompat=/i.test(databaseUrl);
+
+if (needsSSL && (!hasSSLMode || !hasLibpqCompat)) {
   const separator = databaseUrl.includes("?") ? "&" : "?";
-  process.env.DATABASE_URL = `${databaseUrl}${separator}sslmode=require`;
+  const params = [];
+  if (!hasLibpqCompat) params.push("uselibpqcompat=true");
+  if (!hasSSLMode) params.push("sslmode=require");
+  process.env.DATABASE_URL = `${databaseUrl}${separator}${params.join("&")}`;
 }
 
 let command;
