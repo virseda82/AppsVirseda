@@ -46,52 +46,42 @@ export default function EventModal({ open, date, onClose, onCreate }) {
   }
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,0.35)",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        padding: 20,
-      }}
-      onClick={onClose}
-    >
-      <div
-        style={{ width: 420, background: "white", borderRadius: 14, padding: 16 }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h3 style={{ marginTop: 0 }}>Nuevo evento</h3>
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="event-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="event-modal-header">
+          <h3>Nuevo evento</h3>
+        </div>
 
-        <label style={{ display: "block", marginBottom: 10 }}>
-          <div style={{ fontSize: 12, opacity: 0.8 }}>Título</div>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} style={{ width: "100%", padding: 10 }} />
+        <label className="form-field">
+          <span>Título</span>
+          <input value={title} onChange={(e) => setTitle(e.target.value)} />
         </label>
 
-        <label style={{ display: "block", marginBottom: 10 }}>
-          <div style={{ fontSize: 12, opacity: 0.8 }}>Notas</div>
-          <textarea value={notes} onChange={(e) => setNotes(e.target.value)} style={{ width: "100%", padding: 10 }} />
+        <label className="form-field">
+          <span>Notas</span>
+          <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
         </label>
 
-        <label style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 10 }}>
+        <label className="checkbox-row">
           <input type="checkbox" checked={allDay} onChange={(e) => setAllDay(e.target.checked)} />
-          Todo el día (MVP)
+          <span>Todo el día (MVP)</span>
         </label>
 
-        <label style={{ display: "block", marginBottom: 10 }}>
-          <div style={{ fontSize: 12, opacity: 0.8 }}>Inicio</div>
-          <input type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} style={{ width: "100%", padding: 10 }} />
-        </label>
+        <div className="datetime-grid">
+          <label className="form-field">
+            <span>Inicio</span>
+            <input type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} />
+          </label>
 
-        <label style={{ display: "block", marginBottom: 10 }}>
-          <div style={{ fontSize: 12, opacity: 0.8 }}>Fin</div>
-          <input type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)} style={{ width: "100%", padding: 10 }} />
-        </label>
+          <label className="form-field">
+            <span>Fin</span>
+            <input type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)} />
+          </label>
+        </div>
 
-        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-          <button onClick={onClose} style={{ padding: 10 }}>Cancelar</button>
-          <button onClick={submit} style={{ padding: 10 }}>Crear</button>
+        <div className="modal-actions">
+          <button type="button" className="ghost-btn" onClick={onClose}>Cancelar</button>
+          <button type="button" className="primary-btn" onClick={submit}>Crear</button>
         </div>
       </div>
     </div>

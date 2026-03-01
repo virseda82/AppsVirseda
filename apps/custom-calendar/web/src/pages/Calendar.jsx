@@ -70,37 +70,81 @@ export default function CalendarPage({ onLogout }) {
     await loadEvents(familyId, cursor);
   }
 
+  const hasFamilies = families.length > 0;
+
   return (
-    <div style={{ fontFamily: "system-ui", maxWidth: 1100, margin: "20px auto", padding: 10 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: "space-between" }}>
-        <div>
-          <h2 style={{ margin: 0, textTransform: "capitalize" }}>{monthLabel}</h2>
-          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-            <button onClick={prevMonth}>◀</button>
-            <button onClick={today}>Hoy</button>
-            <button onClick={nextMonth}>▶</button>
-            <button onClick={() => openNewEvent(new Date())}>+ Evento</button>
+    <div className="calendar-shell">
+      <header className="calendar-topbar">
+        <div className="calendar-topbar-inner">
+          <div className="topbar-left">
+            <h2 className="month-title">{monthLabel}</h2>
+            <div className="month-nav" role="group" aria-label="Month navigation">
+              <button type="button" className="icon-btn" onClick={prevMonth} aria-label="Mes anterior">
+                &#8249;
+              </button>
+              <button type="button" className="icon-btn icon-btn-secondary" onClick={today} aria-label="Hoy">
+                Hoy
+              </button>
+              <button type="button" className="icon-btn" onClick={nextMonth} aria-label="Mes siguiente">
+                &#8250;
+              </button>
+              <button type="button" className="icon-btn icon-btn-mobile" onClick={today} aria-label="Hoy">
+                &#9679;
+              </button>
+            </div>
+          </div>
+
+          <div className="topbar-right">
+            <select
+              className="family-select"
+              value={familyId || ""}
+              onChange={(e) => setFamilyId(Number(e.target.value))}
+              aria-label="Seleccionar familia"
+            >
+              {families.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.name} ({f.role})
+                </option>
+              ))}
+            </select>
+            <button type="button" className="text-btn" onClick={createFamilyQuick}>
+              + Familia
+            </button>
+            <button type="button" className="ghost-btn" onClick={onLogout}>
+              Logout
+            </button>
+            <button
+              type="button"
+              className="primary-btn desktop-event-btn"
+              onClick={() => openNewEvent(new Date())}
+              disabled={!hasFamilies}
+            >
+              + Evento
+            </button>
           </div>
         </div>
+      </header>
 
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          <select value={familyId || ""} onChange={(e) => setFamilyId(Number(e.target.value))}>
-            {families.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.name} ({f.role})
-              </option>
-            ))}
-          </select>
-          <button onClick={createFamilyQuick}>+ Familia</button>
-          <button onClick={onLogout}>Logout</button>
-        </div>
-      </div>
-
-      <div style={{ marginTop: 20 }}>
+      <main className="calendar-content">
         <MonthView cursor={cursor} events={events} onDayClick={openNewEvent} />
-      </div>
+      </main>
 
-      <EventModal open={modalOpen} date={modalDate} onClose={() => setModalOpen(false)} onCreate={handleCreateEvent} />
+      <button
+        type="button"
+        className="fab-event-btn"
+        onClick={() => openNewEvent(new Date())}
+        aria-label="Crear evento"
+        disabled={!hasFamilies}
+      >
+        +
+      </button>
+
+      <EventModal
+        open={modalOpen}
+        date={modalDate}
+        onClose={() => setModalOpen(false)}
+        onCreate={handleCreateEvent}
+      />
     </div>
   );
 }

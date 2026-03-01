@@ -35,64 +35,58 @@ export default function MonthView({ cursor, events, onDayClick }) {
   }
 
   return (
-    <div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 6, marginBottom: 6 }}>
+    <section className="month-view">
+      <div className="month-header-row">
         {headers.map((h) => (
-          <div key={h} style={{ fontWeight: 700, opacity: 0.7, textAlign: "center" }}>
+          <div key={h} className="month-weekday">
             {h}
           </div>
         ))}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 6 }}>
+      <div className="month-grid">
         {days.map((d) => {
           const inMonth = d.getMonth() === cursor.getMonth();
           const dayEvents = eventsForDay(d);
+          const isToday = sameDay(d, new Date());
 
           return (
-            <div
+            <button
+              type="button"
               key={d.toISOString()}
               onClick={() => onDayClick(new Date(d))}
-              style={{
-                border: "1px solid #ddd",
-                borderRadius: 10,
-                padding: 10,
-                minHeight: 90,
-                cursor: "pointer",
-                background: inMonth ? "white" : "#fafafa",
-                opacity: inMonth ? 1 : 0.6,
-              }}
+              className={`day-cell ${inMonth ? "" : "day-cell-outside"}`.trim()}
+              aria-label={`Día ${d.getDate()}`}
             >
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                <div style={{ fontWeight: 700 }}>{d.getDate()}</div>
+              <div className="day-head">
+                <span className={`day-number ${isToday ? "day-number-today" : ""}`}>
+                  {d.getDate()}
+                </span>
               </div>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <div className="day-events">
                 {dayEvents.slice(0, 3).map((e) => (
-                  <div
+                  <span
                     key={e.id}
-                    style={{
-                      fontSize: 12,
-                      padding: "4px 6px",
-                      borderRadius: 8,
-                      background: "#f2f2f2",
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                    }}
+                    className="event-row"
                     title={e.title}
                   >
-                    {e.title}
-                  </div>
+                    <span
+                      className="event-dot"
+                      style={{ backgroundColor: e.color || "#4285f4" }}
+                      aria-hidden="true"
+                    />
+                    <span className="event-text">{e.title}</span>
+                  </span>
                 ))}
                 {dayEvents.length > 3 && (
-                  <div style={{ fontSize: 12, opacity: 0.7 }}>+{dayEvents.length - 3} más</div>
+                  <span className="more-events-link">+{dayEvents.length - 3} más</span>
                 )}
               </div>
-            </div>
+            </button>
           );
         })}
       </div>
-    </div>
+    </section>
   );
 }
