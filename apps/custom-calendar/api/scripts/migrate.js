@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import dotenv from "dotenv";
@@ -7,6 +8,7 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const migrateCli = resolve(__dirname, "../node_modules/node-pg-migrate/bin/node-pg-migrate.js");
+const migrateBin = resolve(__dirname, "../node_modules/.bin/node-pg-migrate");
 
 const direction = process.argv[2] || "up";
 const validDirections = new Set(["up", "down"]);
@@ -29,7 +31,21 @@ if (needsSSL && !hasSSLMode) {
   process.env.DATABASE_URL = `${databaseUrl}${separator}sslmode=require`;
 }
 
-const child = spawn(process.execPath, [migrateCli, "-m", "migrations", direction], {
+let command;
+let args;
+
+if (existsSync(migrateCli)) {
+  command = process.execPath;
+  args = [migrateCli, "-m", "migrations", direction];
+} else if (existsSync(migrateBin)) {
+  command = migrateBin;
+  args = ["-m", "migrations", direction];
+} else {
+  console.error("node-pg-migrate is not installed. Run npm ci before migrations.");
+  process.exit(1);
+}
+
+const child = spawn(command, args, {
   stdio: "inherit",
   env: process.env,
 });
