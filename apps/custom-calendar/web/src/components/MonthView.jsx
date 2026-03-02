@@ -97,6 +97,11 @@ export default function MonthView({ cursor, events, onDayClick, onEventClick, cu
 
   const headers = ["L", "M", "X", "J", "V", "S", "D"];
 
+  function isRecurringEvent(event) {
+    if (event?.is_recurring === true) return true;
+    return String(event?.id || "").startsWith("r:");
+  }
+
   function eventsForDay(day) {
     const dayKey = toDateOnly(day);
     return events.filter((e) => {
@@ -162,13 +167,14 @@ export default function MonthView({ cursor, events, onDayClick, onEventClick, cu
                       onEventClick?.(e);
                     }}
                   >
-                    <span
-                      className="event-dot"
-                      style={{ backgroundColor: e.color || "#4285f4" }}
-                      aria-hidden="true"
-                    />
-                    {e.is_recurring && <span className="recurring-marker" aria-hidden="true">↻</span>}
-                    <span className="event-text">{e.title}</span>
+                    <span className="event-text">
+                      {e.title}
+                      {isRecurringEvent(e) && (
+                        <span className="recurring-marker" aria-hidden="true">
+                          {" "}↻
+                        </span>
+                      )}
+                    </span>
                   </button>
                 ))}
                 {dayEvents.length > 3 && (
