@@ -550,17 +550,32 @@ app.post("/auth/login", async (req, res) => {
       );
       user = q.rows[0] || null;
     } else {
-      const q = await client.query(
+      const exactQ = await client.query(
         `SELECT id, email, name, color, password_hash
          FROM users
          WHERE LOWER(TRIM(COALESCE(name, ''))) = LOWER(TRIM($1))
          ORDER BY id ASC`,
         [identifier]
       );
-      if (q.rows.length > 1) {
+      if (exactQ.rows.length > 1) {
         return res.status(400).json({ error: "Nombre duplicado, usa el correo electrónico." });
       }
-      user = q.rows[0] || null;
+      if (exactQ.rows.length === 1) {
+        user = exactQ.rows[0];
+      } else {
+        // Fallback: allow partial match when it uniquely identifies one user.
+        const fuzzyQ = await client.query(
+          `SELECT id, email, name, color, password_hash
+           FROM users
+           WHERE LOWER(TRIM(COALESCE(name, ''))) LIKE LOWER(TRIM($1))
+           ORDER BY id ASC`,
+          [`%${identifier}%`]
+        );
+        if (fuzzyQ.rows.length > 1) {
+          return res.status(400).json({ error: "Nombre duplicado, usa el correo electrónico." });
+        }
+        user = fuzzyQ.rows[0] || null;
+      }
     }
     if (!user) return res.status(401).json({ error: "invalid credentials" });
 
