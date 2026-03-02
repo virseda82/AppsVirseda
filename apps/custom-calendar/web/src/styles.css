@@ -217,8 +217,17 @@ select {
 }
 
 .day-cell-outside {
-  background: #f9fbff;
-  opacity: 0.72;
+  background: #f3f6fc;
+  border-color: #edf2fb;
+}
+
+.day-cell-outside .event-text,
+.day-cell-outside .more-events-link {
+  color: #9ba5ba;
+}
+
+.day-number-outside {
+  color: #bcc5d6;
 }
 
 .day-head {
@@ -281,6 +290,12 @@ select {
   text-overflow: ellipsis;
 }
 
+.recurring-marker {
+  font-size: 0.72rem;
+  color: #6b7280;
+  line-height: 1;
+}
+
 .more-events-link {
   margin-top: 2px;
   font-size: 0.76rem;
@@ -328,7 +343,8 @@ select {
 }
 
 .form-field input,
-.form-field textarea {
+.form-field textarea,
+.form-field select {
   width: 100%;
   border: 1px solid #d8deea;
   border-radius: 12px;
@@ -339,6 +355,7 @@ select {
 
 .form-field input:focus,
 .form-field textarea:focus,
+.form-field select:focus,
 .family-select:focus {
   outline: 2px solid rgba(26, 115, 232, 0.18);
   border-color: var(--primary);

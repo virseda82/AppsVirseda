@@ -47,10 +47,15 @@ export const api = {
   createFamily: (payload) => request("/families", { method: "POST", body: payload }),
   listEvents: (familyId, from, to) =>
     request(`/families/${familyId}/events?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
+  listRecurringEvents: (familyId) => request(`/families/${familyId}/recurring-events`),
   createEvent: (familyId, payload) =>
     request(`/families/${familyId}/events`, { method: "POST", body: payload }),
+  createRecurringEvent: (familyId, payload) =>
+    request(`/families/${familyId}/recurring-events`, { method: "POST", body: payload }),
   updateEvent: (id, payload) => request(`/events/${id}`, { method: "PUT", body: payload }),
+  updateRecurringEvent: (id, payload) => request(`/recurring-events/${id}`, { method: "PUT", body: payload }),
   deleteEvent: (id) => request(`/events/${id}`, { method: "DELETE" }),
+  deleteRecurringEvent: (id) => request(`/recurring-events/${id}`, { method: "DELETE" }),
   adminResetEvents: () => request("/admin/reset-events", { method: "POST" }),
   getFamilyCustody: (familyId) => request(`/families/${familyId}/custody`),
   adminListUsers: () => request("/admin/users"),

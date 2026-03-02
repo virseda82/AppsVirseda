@@ -50,16 +50,16 @@ function AuthScreen() {
       <h2>Custom Family Calendar</h2>
 
       <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
-        <button onClick={() => setMode("login")} style={{ padding: 10, flex: 1 }}>Login</button>
-        <button onClick={() => setMode("register")} style={{ padding: 10, flex: 1 }}>Register</button>
+        <button onClick={() => setMode("login")} style={{ padding: 10, flex: 1 }}>Iniciar sesión</button>
+        <button onClick={() => setMode("register")} style={{ padding: 10, flex: 1 }}>Registrarse</button>
       </div>
 
-      <Field label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-      {mode === "register" && <Field label="Name" value={name} onChange={(e) => setName(e.target.value)} />}
-      <Field label="Password (min 8)" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+      <Field label="Correo" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+      {mode === "register" && <Field label="Nombre" value={name} onChange={(e) => setName(e.target.value)} />}
+      <Field label="Contraseña (mín. 8)" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
 
       <button onClick={handleAuth} style={{ padding: 12, width: "100%", marginTop: 10 }}>
-        {mode === "login" ? "Login" : "Create account"}
+        {mode === "login" ? "Iniciar sesión" : "Crear cuenta"}
       </button>
       <button onClick={handleQuickAccessPablo} style={{ padding: 12, width: "100%", marginTop: 10 }}>
         Acceso Pablo Rapidao

@@ -3,6 +3,14 @@ import { Link } from "react-router-dom";
 import { api } from "../api.js";
 
 const DEFAULT_COLOR = "#3b82f6";
+const USER_COLOR_OPTIONS = [
+  { label: "Azul", value: "#3b82f6" },
+  { label: "Morado", value: "#8b5cf6" },
+];
+const CUSTODY_COLOR_OPTIONS = [
+  { label: "Azul", value: "#dbeafe" },
+  { label: "Morado", value: "#f3e8ff" },
+];
 
 export default function AdminPage({ onLogout }) {
   const [users, setUsers] = useState([]);
@@ -181,10 +189,10 @@ export default function AdminPage({ onLogout }) {
   return (
     <div className="admin-page">
       <header className="admin-header">
-        <h2>Admin Panel</h2>
+        <h2>Panel de administración</h2>
         <div className="admin-header-actions">
           <Link className="ghost-btn link-btn" to="/">Calendario</Link>
-          <button className="ghost-btn" type="button" onClick={onLogout}>Logout</button>
+          <button className="ghost-btn" type="button" onClick={onLogout}>Salir</button>
         </div>
       </header>
 
@@ -193,10 +201,14 @@ export default function AdminPage({ onLogout }) {
       <section className="admin-card">
         <h3>Usuarios</h3>
         <div className="admin-user-create">
-          <input placeholder="Email" value={newUser.email} onChange={(e) => setNewUser((v) => ({ ...v, email: e.target.value }))} />
+          <input placeholder="Correo" value={newUser.email} onChange={(e) => setNewUser((v) => ({ ...v, email: e.target.value }))} />
           <input placeholder="Nombre" value={newUser.name} onChange={(e) => setNewUser((v) => ({ ...v, name: e.target.value }))} />
-          <input placeholder="Color" value={newUser.color} onChange={(e) => setNewUser((v) => ({ ...v, color: e.target.value }))} />
-          <input placeholder="Password" type="password" value={newUser.password} onChange={(e) => setNewUser((v) => ({ ...v, password: e.target.value }))} />
+          <select value={newUser.color} onChange={(e) => setNewUser((v) => ({ ...v, color: e.target.value }))}>
+            {USER_COLOR_OPTIONS.map((c) => (
+              <option key={c.value} value={c.value}>{c.label}</option>
+            ))}
+          </select>
+          <input placeholder="Contraseña" type="password" value={newUser.password} onChange={(e) => setNewUser((v) => ({ ...v, password: e.target.value }))} />
           <button className="primary-btn" type="button" onClick={createUser}>Crear usuario</button>
         </div>
 
@@ -206,9 +218,13 @@ export default function AdminPage({ onLogout }) {
               <span className="admin-list-id">#{u.id}</span>
               <span className="admin-list-email">{u.email}</span>
               <input value={u.name || ""} onChange={(e) => setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, name: e.target.value } : x)))} />
-              <input value={u.color || DEFAULT_COLOR} onChange={(e) => setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, color: e.target.value } : x)))} />
+              <select value={u.color || DEFAULT_COLOR} onChange={(e) => setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, color: e.target.value } : x)))}>
+                {USER_COLOR_OPTIONS.map((c) => (
+                  <option key={c.value} value={c.value}>{c.label}</option>
+                ))}
+              </select>
               <button className="ghost-btn" type="button" onClick={() => updateUser(u)}>Guardar</button>
-              <button className="ghost-btn" type="button" onClick={() => updateUserPassword(u.id)}>Password</button>
+              <button className="ghost-btn" type="button" onClick={() => updateUserPassword(u.id)}>Contraseña</button>
               <button className="danger-btn" type="button" onClick={() => deleteUser(u.id)}>Eliminar</button>
             </div>
           ))}
@@ -228,33 +244,41 @@ export default function AdminPage({ onLogout }) {
         </div>
 
         <div className="admin-custody-config">
-          <h4>Config base</h4>
+          <h4>Configuración base</h4>
           <div className="admin-form-grid">
             <label>
-              Anchor Monday
+              Lunes de referencia
               <input type="date" value={configForm.anchor_monday} onChange={(e) => setConfigForm((v) => ({ ...v, anchor_monday: e.target.value }))} />
             </label>
             <label>
-              Anchor Owner
+              Tutor de referencia
               <select value={configForm.anchor_owner} onChange={(e) => setConfigForm((v) => ({ ...v, anchor_owner: e.target.value }))}>
-                <option value="father">father</option>
-                <option value="mother">mother</option>
+                <option value="father">padre</option>
+                <option value="mother">madre</option>
               </select>
             </label>
             <label>
-              Father Color
-              <input value={configForm.father_color} onChange={(e) => setConfigForm((v) => ({ ...v, father_color: e.target.value }))} />
+              Color padre
+              <select value={configForm.father_color} onChange={(e) => setConfigForm((v) => ({ ...v, father_color: e.target.value }))}>
+                {CUSTODY_COLOR_OPTIONS.map((c) => (
+                  <option key={c.value} value={c.value}>{c.label}</option>
+                ))}
+              </select>
             </label>
             <label>
-              Mother Color
-              <input value={configForm.mother_color} onChange={(e) => setConfigForm((v) => ({ ...v, mother_color: e.target.value }))} />
+              Color madre
+              <select value={configForm.mother_color} onChange={(e) => setConfigForm((v) => ({ ...v, mother_color: e.target.value }))}>
+                {CUSTODY_COLOR_OPTIONS.map((c) => (
+                  <option key={c.value} value={c.value}>{c.label}</option>
+                ))}
+              </select>
             </label>
           </div>
-          <button className="primary-btn" type="button" onClick={saveConfig}>Guardar config</button>
+          <button className="primary-btn" type="button" onClick={saveConfig}>Guardar configuración</button>
         </div>
 
         <div className="admin-custody-overrides">
-          <h4>Overrides</h4>
+          <h4>Excepciones</h4>
           <div className="admin-form-grid">
             <label>
               Inicio
@@ -265,15 +289,20 @@ export default function AdminPage({ onLogout }) {
               <input type="date" value={overrideForm.end_date} onChange={(e) => setOverrideForm((v) => ({ ...v, end_date: e.target.value }))} />
             </label>
             <label>
-              Owner
+              Tutor
               <select value={overrideForm.owner} onChange={(e) => setOverrideForm((v) => ({ ...v, owner: e.target.value }))}>
-                <option value="father">father</option>
-                <option value="mother">mother</option>
+                <option value="father">padre</option>
+                <option value="mother">madre</option>
               </select>
             </label>
             <label>
               Color (opcional)
-              <input value={overrideForm.color} onChange={(e) => setOverrideForm((v) => ({ ...v, color: e.target.value }))} />
+              <select value={overrideForm.color} onChange={(e) => setOverrideForm((v) => ({ ...v, color: e.target.value }))}>
+                <option value="">Automático</option>
+                {CUSTODY_COLOR_OPTIONS.map((c) => (
+                  <option key={c.value} value={c.value}>{c.label}</option>
+                ))}
+              </select>
             </label>
             <label className="admin-col-span-2">
               Notas
@@ -282,7 +311,7 @@ export default function AdminPage({ onLogout }) {
           </div>
           <div className="admin-actions-row">
             <button className="primary-btn" type="button" onClick={saveOverride}>
-              {overrideForm.id ? "Actualizar override" : "Crear override"}
+              {overrideForm.id ? "Actualizar excepción" : "Crear excepción"}
             </button>
             {overrideForm.id && (
               <button className="ghost-btn" type="button" onClick={resetOverrideForm}>Cancelar edición</button>
@@ -294,8 +323,8 @@ export default function AdminPage({ onLogout }) {
               <div className="admin-list-row" key={ov.id}>
                 <span className="admin-list-id">#{ov.id}</span>
                 <span>{String(ov.start_date).slice(0, 10)} - {String(ov.end_date).slice(0, 10)}</span>
-                <span>{ov.owner}</span>
-                <span>{ov.color || "(default)"}</span>
+                <span>{ov.owner === "father" ? "padre" : "madre"}</span>
+                <span>{ov.color || "(automático)"}</span>
                 <span>{ov.notes || ""}</span>
                 <button className="ghost-btn" type="button" onClick={() => editOverride(ov)}>Editar</button>
                 <button className="danger-btn" type="button" onClick={() => deleteOverride(ov.id)}>Eliminar</button>
