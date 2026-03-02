@@ -6,66 +6,56 @@ import AdminPage from "./pages/Admin.jsx";
 
 function Field({ label, ...props }) {
   return (
-    <label style={{ display: "block", marginBottom: 10 }}>
-      <div style={{ fontSize: 12, opacity: 0.8 }}>{label}</div>
-      <input {...props} style={{ width: "100%", padding: 10, fontSize: 14 }} />
+    <label className="auth-field">
+      <div className="auth-label">{label}</div>
+      <input {...props} className="auth-input" />
     </label>
   );
 }
 
 function AuthScreen() {
-  const QUICK_EMAIL = "virseda82@gmail.com";
-  const QUICK_PASSWORD = "12345678";
-  const [mode, setMode] = useState("login");
-  const [email, setEmail] = useState("");
-  const [name, setName] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  async function handleAuth() {
+  async function handleLogin() {
     setErr("");
+    setBusy(true);
     try {
-      const payload = mode === "register" ? { email, name, password } : { email, password };
-      const r = mode === "register" ? await api.register(payload) : await api.login(payload);
+      const normalized = String(identifier || "").trim();
+      const r = await api.login({ identifier: normalized, email: normalized, password });
       setToken(r.token);
       window.location.reload();
     } catch (e) {
       setErr(e.message);
-    }
-  }
-
-  async function handleQuickAccessPablo() {
-    setErr("");
-    try {
-      const r = await api.login({ email: QUICK_EMAIL, password: QUICK_PASSWORD });
-      setToken(r.token);
-      window.location.reload();
-    } catch (e) {
-      setErr(e.message);
+    } finally {
+      setBusy(false);
     }
   }
 
   return (
-    <div style={{ maxWidth: 420, margin: "50px auto", fontFamily: "system-ui" }}>
-      <h2>Custom Family Calendar</h2>
-
-      <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
-        <button onClick={() => setMode("login")} style={{ padding: 10, flex: 1 }}>Iniciar sesión</button>
-        <button onClick={() => setMode("register")} style={{ padding: 10, flex: 1 }}>Registrarse</button>
+    <div className="auth-page">
+      <div className="auth-card">
+        <h1 className="auth-title">Calendario de Oli</h1>
+        <Field
+          label="Usuario"
+          value={identifier}
+          onChange={(e) => setIdentifier(e.target.value)}
+          autoComplete="username"
+        />
+        <Field
+          label="Contraseña"
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          autoComplete="current-password"
+        />
+        <button className="auth-submit-btn" onClick={handleLogin} disabled={busy}>
+          Iniciar sesión
+        </button>
+        {err && <p className="auth-error">{err}</p>}
       </div>
-
-      <Field label="Correo" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-      {mode === "register" && <Field label="Nombre" value={name} onChange={(e) => setName(e.target.value)} />}
-      <Field label="Contraseña (mín. 8)" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
-
-      <button onClick={handleAuth} style={{ padding: 12, width: "100%", marginTop: 10 }}>
-        {mode === "login" ? "Iniciar sesión" : "Crear cuenta"}
-      </button>
-      <button onClick={handleQuickAccessPablo} style={{ padding: 12, width: "100%", marginTop: 10 }}>
-        Acceso Pablo Rapidao
-      </button>
-
-      {err && <p style={{ color: "crimson", marginTop: 15 }}>{err}</p>}
     </div>
   );
 }

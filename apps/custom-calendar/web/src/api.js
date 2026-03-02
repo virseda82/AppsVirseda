@@ -41,7 +41,6 @@ async function request(path, { method = "GET", body } = {}) {
 }
 
 export const api = {
-  register: (payload) => request("/auth/register", { method: "POST", body: payload }),
   login: (payload) => request("/auth/login", { method: "POST", body: payload }),
   listFamilies: () => request("/families"),
   createFamily: (payload) => request("/families", { method: "POST", body: payload }),

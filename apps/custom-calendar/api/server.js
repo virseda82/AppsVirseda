@@ -533,16 +533,35 @@ app.post("/auth/register", async (req, res) => {
 });
 
 app.post("/auth/login", async (req, res) => {
-  const { email, password } = req.body;
-  if (!email || !password) return res.status(400).json({ error: "email/password required" });
+  const identifierRaw = req.body?.identifier ?? req.body?.email;
+  const identifier = String(identifierRaw || "").trim();
+  const password = req.body?.password;
+  if (!identifier || !password) {
+    return res.status(400).json({ error: "usuario/contraseña requeridos" });
+  }
 
   const client = await pool.connect();
   try {
-    const q = await client.query(
-      "SELECT id, email, name, color, password_hash FROM users WHERE email=$1",
-      [email.toLowerCase()]
-    );
-    const user = q.rows[0];
+    let user = null;
+    if (identifier.includes("@")) {
+      const q = await client.query(
+        "SELECT id, email, name, color, password_hash FROM users WHERE email=$1",
+        [identifier.toLowerCase()]
+      );
+      user = q.rows[0] || null;
+    } else {
+      const q = await client.query(
+        `SELECT id, email, name, color, password_hash
+         FROM users
+         WHERE LOWER(TRIM(COALESCE(name, ''))) = LOWER(TRIM($1))
+         ORDER BY id ASC`,
+        [identifier]
+      );
+      if (q.rows.length > 1) {
+        return res.status(400).json({ error: "Nombre duplicado, usa el correo electrónico." });
+      }
+      user = q.rows[0] || null;
+    }
     if (!user) return res.status(401).json({ error: "invalid credentials" });
 
     const ok = await bcrypt.compare(password, user.password_hash);
