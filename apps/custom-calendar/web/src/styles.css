@@ -84,7 +84,8 @@ select {
 .icon-btn,
 .text-btn,
 .ghost-btn,
-.primary-btn {
+.primary-btn,
+.danger-btn {
   border: 1px solid var(--border);
   background: #fff;
   color: #3c4043;
@@ -93,6 +94,12 @@ select {
   padding: 0 14px;
   cursor: pointer;
   transition: all 0.2s ease;
+}
+
+.link-btn {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
 }
 
 .icon-btn {
@@ -125,6 +132,17 @@ select {
 .primary-btn:hover {
   background: var(--primary-hover);
   border-color: var(--primary-hover);
+}
+
+.danger-btn {
+  border-color: #dc3545;
+  background: #fff;
+  color: #b42318;
+  font-weight: 600;
+}
+
+.danger-btn:hover {
+  background: #fff1f2;
 }
 
 .primary-btn:disabled,
@@ -194,9 +212,22 @@ select {
   box-shadow: var(--shadow-soft);
 }
 
+.day-cell:focus-visible {
+  outline: 2px solid rgba(26, 115, 232, 0.32);
+}
+
 .day-cell-outside {
-  background: #f9fbff;
-  opacity: 0.72;
+  background: #f3f6fc;
+  border-color: #edf2fb;
+}
+
+.day-cell-outside .event-text,
+.day-cell-outside .more-events-link {
+  color: #9ba5ba;
+}
+
+.day-number-outside {
+  color: #bcc5d6;
 }
 
 .day-head {
@@ -231,11 +262,17 @@ select {
 }
 
 .event-row {
+  width: 100%;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  text-align: left;
   min-width: 0;
   display: inline-flex;
   align-items: center;
   gap: 7px;
   color: #202124;
+  cursor: pointer;
 }
 
 .event-dot {
@@ -251,6 +288,12 @@ select {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.recurring-marker {
+  font-size: 0.72rem;
+  color: #6b7280;
+  line-height: 1;
 }
 
 .more-events-link {
@@ -300,7 +343,8 @@ select {
 }
 
 .form-field input,
-.form-field textarea {
+.form-field textarea,
+.form-field select {
   width: 100%;
   border: 1px solid #d8deea;
   border-radius: 12px;
@@ -311,6 +355,7 @@ select {
 
 .form-field input:focus,
 .form-field textarea:focus,
+.form-field select:focus,
 .family-select:focus {
   outline: 2px solid rgba(26, 115, 232, 0.18);
   border-color: var(--primary);
@@ -358,6 +403,126 @@ select {
 
 .fab-event-btn:hover {
   background: var(--primary-hover);
+}
+
+.admin-page {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.admin-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.admin-header h2 {
+  margin: 0;
+}
+
+.admin-header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.admin-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.admin-card h3,
+.admin-card h4 {
+  margin: 0 0 10px;
+}
+
+.admin-error {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+  background: #fff1f2;
+  color: #b42318;
+}
+
+.admin-user-create {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.admin-user-create input,
+.admin-family-select select,
+.admin-form-grid input,
+.admin-form-grid select,
+.admin-list-row input {
+  width: 100%;
+  border: 1px solid #d8deea;
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+.admin-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.admin-list-row {
+  display: grid;
+  grid-template-columns: 60px 1.4fr 1fr 1fr auto auto auto;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid #eceff5;
+  border-radius: 10px;
+  padding: 8px;
+}
+
+.admin-list-id {
+  font-weight: 600;
+  color: #5f6368;
+}
+
+.admin-list-email {
+  font-size: 0.92rem;
+}
+
+.admin-family-select {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.admin-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.admin-form-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.9rem;
+}
+
+.admin-col-span-2 {
+  grid-column: span 2;
+}
+
+.admin-actions-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
 }
 
 @media (max-width: 980px) {
@@ -436,5 +601,21 @@ select {
 
   .fab-event-btn {
     display: inline-flex;
+  }
+
+  .admin-user-create {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-list-row {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-col-span-2 {
+    grid-column: span 1;
   }
 }

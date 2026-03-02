@@ -7,15 +7,36 @@ function toLocalInputValue(date) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
-export default function EventModal({ open, date, onClose, onCreate }) {
+export default function EventModal({ open, date, event, onClose, onCreate, onUpdate, onDelete }) {
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
   const [allDay, setAllDay] = useState(false);
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
+  const [repeat, setRepeat] = useState("none");
+  const [untilDate, setUntilDate] = useState("");
+  const [busy, setBusy] = useState(false);
+  const isEditMode = !!event?.id;
+  const isRecurringEvent = !!event?.is_recurring;
 
   useEffect(() => {
     if (!open) return;
+    if (event?.id) {
+      setTitle(event.title || "");
+      setNotes(event.notes || "");
+      setAllDay(!!event.all_day);
+      setStart(toLocalInputValue(new Date(event.start_at)));
+      setEnd(toLocalInputValue(new Date(event.end_at)));
+      if (event.is_recurring) {
+        setRepeat(Number(event.interval) === 2 ? "biweekly" : "weekly");
+        setUntilDate(event.until_date || "");
+      } else {
+        setRepeat("none");
+        setUntilDate("");
+      }
+      return;
+    }
+
     const base = date ? new Date(date) : new Date();
     base.setHours(18, 0, 0, 0);
     const endD = new Date(base);
@@ -26,7 +47,10 @@ export default function EventModal({ open, date, onClose, onCreate }) {
     setAllDay(false);
     setStart(toLocalInputValue(base));
     setEnd(toLocalInputValue(endD));
-  }, [open, date]);
+    setRepeat("none");
+    setUntilDate("");
+    setBusy(false);
+  }, [open, date, event]);
 
   if (!open) return null;
 
@@ -35,21 +59,50 @@ export default function EventModal({ open, date, onClose, onCreate }) {
     const startAt = new Date(start).toISOString();
     const endAt = new Date(end).toISOString();
 
-    await onCreate({
+    const payload = {
       title: title.trim(),
       notes: notes.trim(),
       startAt,
       endAt,
       allDay,
-      color: null,
-    });
+      color: event?.color || null,
+      byweekday: new Date(start).getDay(),
+      repeat,
+      interval: repeat === "biweekly" ? 2 : 1,
+      untilDate: repeat === "none" ? null : (untilDate || null),
+    };
+
+    setBusy(true);
+    try {
+      if (isEditMode) {
+        await onUpdate(payload);
+        return;
+      }
+      await onCreate(payload);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleDeleteClick() {
+    if (!onDelete) return;
+    setBusy(true);
+    try {
+      await onDelete();
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="event-modal" onClick={(e) => e.stopPropagation()}>
         <div className="event-modal-header">
-          <h3>Nuevo evento</h3>
+          <h3>
+            {isEditMode
+              ? (isRecurringEvent ? "Editar serie recurrente" : "Editar evento")
+              : "Nuevo evento"}
+          </h3>
         </div>
 
         <label className="form-field">
@@ -79,9 +132,41 @@ export default function EventModal({ open, date, onClose, onCreate }) {
           </label>
         </div>
 
+        <div className="datetime-grid">
+          <label className="form-field">
+            <span>Repetir</span>
+            <select
+              value={repeat}
+              onChange={(e) => setRepeat(e.target.value)}
+              disabled={isEditMode && !isRecurringEvent}
+            >
+              <option value="none">Ninguno</option>
+              <option value="weekly">Semanal</option>
+              <option value="biweekly">Quincenal</option>
+            </select>
+          </label>
+
+          <label className="form-field">
+            <span>Hasta (opcional)</span>
+            <input
+              type="date"
+              value={untilDate}
+              onChange={(e) => setUntilDate(e.target.value)}
+              disabled={repeat === "none" || (isEditMode && !isRecurringEvent)}
+            />
+          </label>
+        </div>
+
         <div className="modal-actions">
-          <button type="button" className="ghost-btn" onClick={onClose}>Cancelar</button>
-          <button type="button" className="primary-btn" onClick={submit}>Crear</button>
+          {isEditMode && (
+            <button type="button" className="danger-btn" onClick={handleDeleteClick} disabled={busy}>
+              Eliminar
+            </button>
+          )}
+          <button type="button" className="ghost-btn" onClick={onClose} disabled={busy}>Cancelar</button>
+          <button type="button" className="primary-btn" onClick={submit} disabled={busy}>
+            {isEditMode ? (isRecurringEvent ? "Guardar serie" : "Guardar") : "Crear"}
+          </button>
         </div>
       </div>
     </div>
