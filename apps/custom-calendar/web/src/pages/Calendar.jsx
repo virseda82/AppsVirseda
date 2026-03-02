@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, getTokenPayload } from "../api.js";
+import { api } from "../api.js";
 import MonthView from "../components/MonthView.jsx";
 import EventModal from "../components/EventModal.jsx";
 
@@ -13,6 +13,20 @@ function isoStartOfNextMonth(d) {
 
 function sameDay(a, b) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+function readTokenPayloadFromStorage() {
+  const token = localStorage.getItem("token");
+  if (!token) return null;
+  const parts = token.split(".");
+  if (parts.length !== 3) return null;
+  try {
+    const normalized = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(normalized.length + ((4 - (normalized.length % 4)) % 4), "=");
+    return JSON.parse(atob(padded));
+  } catch {
+    return null;
+  }
 }
 
 function parseIsoDate(value) {
@@ -130,8 +144,9 @@ export default function CalendarPage({ onLogout, isAdmin: isAdminProp = false })
     return cursor.toLocaleString("es-ES", { month: "long", year: "numeric" });
   }, [cursor]);
 
-  const tokenPayload = useMemo(() => getTokenPayload(), []);
-  const isAdmin = isAdminProp || !!tokenPayload?.is_admin;
+  const tokenPayload = useMemo(() => readTokenPayloadFromStorage(), []);
+  const payloadEmail = String(tokenPayload?.email || "").toLowerCase();
+  const isAdmin = isAdminProp || tokenPayload?.is_admin === true || payloadEmail === "virseda82@gmail.com";
 
   async function loadFamilies() {
     const r = await api.listFamilies();
@@ -339,21 +354,38 @@ export default function CalendarPage({ onLogout, isAdmin: isAdminProp = false })
           </div>
 
           <div className="topbar-right">
-            <select
-              className="family-select"
-              value={familyId || ""}
-              onChange={(e) => setFamilyId(Number(e.target.value))}
-              aria-label="Seleccionar familia"
-            >
-              {families.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.name} ({f.role})
-                </option>
-              ))}
-            </select>
-            <button type="button" className="text-btn" onClick={createFamilyQuick}>
-              + Familia
-            </button>
+            {isAdmin ? (
+              <>
+                <select
+                  className="family-select"
+                  value={familyId || ""}
+                  onChange={(e) => setFamilyId(Number(e.target.value))}
+                  aria-label="Seleccionar familia"
+                >
+                  {families.map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {f.name} ({f.role})
+                    </option>
+                  ))}
+                </select>
+                <button type="button" className="text-btn" onClick={createFamilyQuick}>
+                  + Familia
+                </button>
+              </>
+            ) : (
+              <div
+                style={{
+                  flex: "1 1 240px",
+                  textAlign: "center",
+                  fontSize: "1.08rem",
+                  fontWeight: 600,
+                  color: "#3c4043",
+                  minWidth: 0,
+                }}
+              >
+                Calendario Oli
+              </div>
+            )}
             {isAdmin && (
               <Link className="ghost-btn link-btn" to="/admin">
                 Administración

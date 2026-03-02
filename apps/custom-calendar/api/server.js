@@ -1009,6 +1009,7 @@ app.post("/admin/users", auth, requireAdmin, async (req, res) => {
 
   const client = await pool.connect();
   try {
+    await client.query("BEGIN");
     const hash = await bcrypt.hash(password, 12);
     const ins = await client.query(
       `INSERT INTO users(email, name, color, password_hash)
@@ -1016,8 +1017,21 @@ app.post("/admin/users", auth, requireAdmin, async (req, res) => {
        RETURNING id, email, name, color`,
       [String(email).toLowerCase(), name || null, color || "#3b82f6", hash]
     );
+
+    // Auto-link new users to the creator's families so they can access shared calendar.
+    await client.query(
+      `INSERT INTO family_members (family_id, user_id, role)
+       SELECT fm.family_id, $1, 'reader'
+       FROM family_members fm
+       WHERE fm.user_id = $2
+       ON CONFLICT (family_id, user_id) DO NOTHING`,
+      [ins.rows[0].id, req.user.userId]
+    );
+
+    await client.query("COMMIT");
     res.status(201).json({ user: ins.rows[0] });
   } catch (e) {
+    await client.query("ROLLBACK");
     if (String(e?.message || "").includes("duplicate key")) {
       return res.status(409).json({ error: "email already exists" });
     }

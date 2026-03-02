@@ -2,11 +2,6 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api.js";
 
-const DEFAULT_COLOR = "#3b82f6";
-const USER_COLOR_OPTIONS = [
-  { label: "Azul", value: "#3b82f6" },
-  { label: "Morado", value: "#8b5cf6" },
-];
 const CUSTODY_COLOR_OPTIONS = [
   { label: "Azul", value: "#dbeafe" },
   { label: "Morado", value: "#f3e8ff" },
@@ -19,7 +14,7 @@ export default function AdminPage({ onLogout }) {
   const [custody, setCustody] = useState({ config: null, overrides: [] });
   const [err, setErr] = useState("");
 
-  const [newUser, setNewUser] = useState({ email: "", name: "", color: DEFAULT_COLOR, password: "" });
+  const [newUser, setNewUser] = useState({ email: "", name: "", password: "" });
 
   const [configForm, setConfigForm] = useState({
     anchor_monday: "2026-03-02",
@@ -92,8 +87,12 @@ export default function AdminPage({ onLogout }) {
   async function createUser() {
     try {
       setErr("");
-      await api.adminCreateUser(newUser);
-      setNewUser({ email: "", name: "", color: DEFAULT_COLOR, password: "" });
+      await api.adminCreateUser({
+        email: newUser.email,
+        name: newUser.name,
+        password: newUser.password,
+      });
+      setNewUser({ email: "", name: "", password: "" });
       await loadUsers();
     } catch (e) {
       setErr(e.message || "Error creando usuario");
@@ -103,7 +102,7 @@ export default function AdminPage({ onLogout }) {
   async function updateUser(user) {
     try {
       setErr("");
-      await api.adminUpdateUser(user.id, { name: user.name, color: user.color });
+      await api.adminUpdateUser(user.id, { name: user.name });
       await loadUsers();
     } catch (e) {
       setErr(e.message || "Error actualizando usuario");
@@ -203,26 +202,16 @@ export default function AdminPage({ onLogout }) {
         <div className="admin-user-create">
           <input placeholder="Correo" value={newUser.email} onChange={(e) => setNewUser((v) => ({ ...v, email: e.target.value }))} />
           <input placeholder="Nombre" value={newUser.name} onChange={(e) => setNewUser((v) => ({ ...v, name: e.target.value }))} />
-          <select value={newUser.color} onChange={(e) => setNewUser((v) => ({ ...v, color: e.target.value }))}>
-            {USER_COLOR_OPTIONS.map((c) => (
-              <option key={c.value} value={c.value}>{c.label}</option>
-            ))}
-          </select>
           <input placeholder="Contraseña" type="password" value={newUser.password} onChange={(e) => setNewUser((v) => ({ ...v, password: e.target.value }))} />
           <button className="primary-btn" type="button" onClick={createUser}>Crear usuario</button>
         </div>
 
         <div className="admin-list">
           {users.map((u) => (
-            <div className="admin-list-row" key={u.id}>
+            <div className="admin-list-row admin-user-row" key={u.id}>
               <span className="admin-list-id">#{u.id}</span>
               <span className="admin-list-email">{u.email}</span>
               <input value={u.name || ""} onChange={(e) => setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, name: e.target.value } : x)))} />
-              <select value={u.color || DEFAULT_COLOR} onChange={(e) => setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, color: e.target.value } : x)))}>
-                {USER_COLOR_OPTIONS.map((c) => (
-                  <option key={c.value} value={c.value}>{c.label}</option>
-                ))}
-              </select>
               <button className="ghost-btn" type="button" onClick={() => updateUser(u)}>Guardar</button>
               <button className="ghost-btn" type="button" onClick={() => updateUserPassword(u.id)}>Contraseña</button>
               <button className="danger-btn" type="button" onClick={() => deleteUser(u.id)}>Eliminar</button>
